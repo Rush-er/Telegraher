@@ -9,11 +9,6 @@ configurations {
     compile.exclude module: 'support-v4'
 }
 
-configurations.all {
-    exclude group: 'com.google.firebase', module: 'firebase-core'
-    exclude group: 'androidx.recyclerview', module: 'recyclerview'
-}
-
 dependencies {
     implementation 'androidx.core:core:1.6.0'
     implementation 'androidx.palette:palette:1.0.0'
@@ -25,13 +20,24 @@ dependencies {
 
     compileOnly 'org.checkerframework:checker-qual:2.5.2'
     compileOnly 'org.checkerframework:checker-compat-qual:2.5.0'
+    implementation 'com.google.android.gms:play-services-maps:17.0.0'
+    implementation 'com.google.android.gms:play-services-location:17.0.0'
     implementation 'com.googlecode.mp4parser:isoparser:1.0.6'
     implementation 'com.stripe:stripe-android:2.0.2'
     implementation 'com.google.code.gson:gson:2.8.6'
-    implementation 'org.osmdroid:osmdroid-android:6.1.6'
+    implementation files('libs/libgsaverification-client.aar')
 }
 
-    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:1.1.5'
+//return an api key from a properties file.
+def getAppId(){
+    Properties properties = new Properties()
+    properties.load(new FileInputStream("./API_KEYS"))
+    return properties.get("APP_ID")
+}
+def getAppHash(){
+    Properties properties = new Properties()
+    properties.load(new FileInputStream("./API_KEYS"))
+    return "\"" + properties.get("APP_HASH") + "\""
 }
 
 android {

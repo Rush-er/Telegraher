@@ -3958,6 +3958,10 @@ public class NotificationsController extends BaseController {
         }
 
         ArrayList<NotificationHolder> holders = new ArrayList<>();
+<<<<<<< HEAD
+=======
+        JSONArray serializedNotifications = null;
+>>>>>>> 4e7cb4365 ([TF][KILL] remaining GMS(GCM, Wear, etc), except for Maps)
 
         boolean useSummaryNotification = Build.VERSION.SDK_INT <= Build.VERSION_CODES.O_MR1 || sortedDialogs.size() > 1;
         if (useSummaryNotification && Build.VERSION.SDK_INT >= 26) {
@@ -4492,6 +4496,7 @@ public class NotificationsController extends BaseController {
             }
             notificationManager.cancel(id);
         }
+<<<<<<< HEAD
 
         ArrayList<String> ids = new ArrayList<>(holders.size());
         for (int a = 0, size = holders.size(); a < size; a++) {
@@ -4506,6 +4511,14 @@ public class NotificationsController extends BaseController {
             holder.call();
             if (!unsupportedNotificationShortcut() && !ids.isEmpty()) {
                 ShortcutManagerCompat.removeDynamicShortcuts(ApplicationLoader.applicationContext, ids);
+=======
+        if (serializedNotifications != null) {
+            try {
+                JSONObject s = new JSONObject();
+                s.put("id", selfUserId);
+                s.put("n", serializedNotifications);
+            } catch (Exception ignore) {
+>>>>>>> 4e7cb4365 ([TF][KILL] remaining GMS(GCM, Wear, etc), except for Maps)
             }
         }
     }

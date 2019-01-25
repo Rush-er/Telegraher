@@ -31,6 +31,7 @@ import android.os.SystemClock;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 
+<<<<<<< HEAD
 import androidx.annotation.NonNull;
 import androidx.multidex.MultiDex;
 
@@ -39,6 +40,8 @@ import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.firebase.messaging.FirebaseMessaging;
 
 import org.telegram.messenger.voip.VideoCapturerDevice;
+=======
+>>>>>>> 4e7cb4365 ([TF][KILL] remaining GMS(GCM, Wear, etc), except for Maps)
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.Components.ForegroundDetector;
@@ -183,7 +186,6 @@ public class ApplicationLoader extends Application {
         }
 
         ApplicationLoader app = (ApplicationLoader) ApplicationLoader.applicationContext;
-        app.initPlayServices();
         if (BuildVars.LOGS_ENABLED) {
             FileLog.d("app initied");
         }
@@ -198,7 +200,10 @@ public class ApplicationLoader extends Application {
             if (finalA == UserConfig.selectedAccount) initRunnable.run();
             else  Utilities.stageQueue.postRunnable(initRunnable);
         }
+<<<<<<< HEAD
         ChatThemeController.init();
+=======
+>>>>>>> 4e7cb4365 ([TF][KILL] remaining GMS(GCM, Wear, etc), except for Maps)
     }
 
     public ApplicationLoader() {
@@ -312,6 +317,7 @@ public class ApplicationLoader extends Application {
         }
     }
 
+<<<<<<< HEAD
     private void initPlayServices() {
         AndroidUtilities.runOnUIThread(() -> {
             if (hasPlayServices = checkPlayServices()) {
@@ -367,6 +373,8 @@ public class ApplicationLoader extends Application {
         }
         return true;
     }
+=======
+>>>>>>> 4e7cb4365 ([TF][KILL] remaining GMS(GCM, Wear, etc), except for Maps)
 
     private static void ensureCurrentNetworkGet(boolean force) {
         if (force || currentNetworkInfo == null) {
