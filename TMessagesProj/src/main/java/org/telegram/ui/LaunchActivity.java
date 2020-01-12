@@ -163,14 +163,21 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import androidx.recyclerview.widget.ItemTouchHelper;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 public class LaunchActivity extends BasePermissionsActivity implements ActionBarLayout.ActionBarLayoutDelegate, NotificationCenter.NotificationCenterDelegate, DialogsActivity.DialogsActivityDelegate {
 
     private static final String EXTRA_ACTION_TOKEN = "actions.fulfillment.extra.ACTION_TOKEN";
 
     private boolean finished;
+    final private Pattern locationRegex = Pattern.compile("geo: ?(-?\\d+\\.\\d+),(-?\\d+\\.\\d+)(,|\\?z=)(-?\\d+)");
+    private Location sendingLocation;
     private String videoPath;
     private String sendingText;
     private ArrayList<SendMessagesHelper.SendingMediaInfo> photoPathsArray;
@@ -1275,60 +1282,44 @@ public class LaunchActivity extends BasePermissionsActivity implements ActionBar
         if (!fromPassword && (AndroidUtilities.needShowPasscode(true) || SharedConfig.isWaitingForPasscodeEnter)) {
             showPasscodeActivity(true, false, -1, -1, null, null);
             UserConfig.getInstance(currentAccount).saveConfig(false);
-            if (!isVoipIntent) {
-                passcodeSaveIntent = intent;
-                passcodeSaveIntentIsNew = isNew;
-                passcodeSaveIntentIsRestore = restore;
-                return false;
+        } else {
+            boolean pushOpened = false;
+
+            int push_user_id = 0;
+            int push_chat_id = 0;
+            int push_enc_id = 0;
+            int push_msg_id = 0;
+            int open_settings = 0;
+            int open_new_dialog = 0;
+            long dialogId = 0;
+            if (SharedConfig.directShare && intent != null && intent.getExtras() != null) {
+                dialogId = intent.getExtras().getLong("dialogId", 0);
+                long hash = intent.getExtras().getLong("hash", 0);
+                if (hash != SharedConfig.directShareHash) {
+                    dialogId = 0;
+                }
             }
-        }
-        boolean pushOpened = false;
-        long push_user_id = 0;
-        long push_chat_id = 0;
-        int push_enc_id = 0;
-        int push_msg_id = 0;
-        int open_settings = 0;
-        int open_widget_edit = -1;
-        int open_widget_edit_type = -1;
-        int open_new_dialog = 0;
-        long dialogId = 0;
-        boolean showDialogsList = false;
-        boolean showPlayer = false;
-        boolean showLocations = false;
-        boolean showGroupVoip = false;
-        boolean showCallLog = false;
-        boolean audioCallUser = false;
-        boolean videoCallUser = false;
-        boolean needCallAlert = false;
-        boolean newContact = false;
-        boolean newContactAlert = false;
-        boolean scanQr = false;
-        String searchQuery = null;
-        String callSearchQuery = null;
-        String newContactName = null;
-        String newContactPhone = null;
+            boolean showDialogsList = false;
+            boolean showPlayer = false;
+            boolean showLocations = false;
 
-        photoPathsArray = null;
-        videoPath = null;
-        sendingText = null;
-        documentsPathsArray = null;
-        documentsOriginalPathsArray = null;
-        documentsMimeType = null;
-        documentsUrisArray = null;
-        exportingChatUri = null;
-        contactsToSend = null;
-        contactsToSendUri = null;
-        importingStickers = null;
-        importingStickersEmoji = null;
-        importingStickersSoftware = null;
+            photoPathsArray = null;
+            videoPath = null;
+            sendingText = null;
+            sendingLocation = null;
+            documentsPathsArray = null;
+            documentsOriginalPathsArray = null;
+            documentsMimeType = null;
+            documentsUrisArray = null;
+            contactsToSend = null;
+            contactsToSendUri = null;
 
-        if ((flags & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) == 0) {
-            if (intent != null && intent.getAction() != null && !restore) {
-                if (Intent.ACTION_SEND.equals(intent.getAction())) {
-                    if (SharedConfig.directShare && intent != null && intent.getExtras() != null) {
-                        dialogId = intent.getExtras().getLong("dialogId", 0);
-                        String hash = null;
-                        if (dialogId == 0) {
+            if ((flags & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) == 0) {
+                if (intent != null && intent.getAction() != null && !restore) {
+                    if (Intent.ACTION_SEND.equals(intent.getAction())) {
+                        boolean error = false;
+                        String type = intent.getType();
+                        if (type != null && type.equals(ContactsContract.Contacts.CONTENT_VCARD_TYPE)) {
                             try {
                                 String id = intent.getExtras().getString(ShortcutManagerCompat.EXTRA_SHORTCUT_ID);
                                 if (id != null) {
@@ -1354,20 +1345,30 @@ public class LaunchActivity extends BasePermissionsActivity implements ActionBar
                         }
                     }
 
-                    boolean error = false;
-                    String type = intent.getType();
-                    if (type != null && type.equals(ContactsContract.Contacts.CONTENT_VCARD_TYPE)) {
-                        try {
-                            Uri uri = (Uri) intent.getExtras().get(Intent.EXTRA_STREAM);
-                            if (uri != null) {
-                                contactsToSend = AndroidUtilities.loadVCardFromStream(uri, currentAccount, false, null, null);
-                                if (contactsToSend.size() > 5) {
-                                    contactsToSend = null;
-                                    documentsUrisArray = new ArrayList<>();
-                                    documentsUrisArray.add(uri);
-                                    documentsMimeType = type;
-                                } else {
-                                    contactsToSendUri = uri;
+                            if (!TextUtils.isEmpty(text)) {
+                                Matcher m = locationRegex.matcher(text);
+                                if (m.find()) {
+                                    String lines[] = text.split("\\n");
+                                    String venueTitle = null;
+                                    String venueAddress = null;
+                                    if (lines[0].equals("My Position")){
+                                        // Use normal GeoPoint message (user position)
+                                    }
+                                    else if(!lines[0].contains("geo:")){
+                                        venueTitle = lines[0];
+                                        if(!lines[1].contains("geo:")){
+                                            venueAddress = lines[1];
+                                        }
+                                    }
+                                    sendingLocation = new Location("");
+                                    sendingLocation.setLatitude(Double.parseDouble(m.group(1)));
+                                    sendingLocation.setLongitude(Double.parseDouble(m.group(2)));
+                                    Bundle bundle = new Bundle();
+                                    bundle.putCharSequence("venueTitle", venueTitle);
+                                    bundle.putCharSequence("venueAddress", venueAddress);
+                                    sendingLocation.setExtras(bundle);
+                                } else if ((text.startsWith("http://") || text.startsWith("https://")) && !TextUtils.isEmpty(subject)) {
+                                    text = subject + "\n" + text;
                                 }
                             } else {
                                 error = true;
@@ -1468,6 +1469,8 @@ public class LaunchActivity extends BasePermissionsActivity implements ActionBar
                                         }
                                     }
                                 }
+                            } else if (sendingText == null && sendingLocation == null) {
+                                error = true;
                             }
                         } else if (sendingText == null) {
                             error = true;
@@ -2749,17 +2752,43 @@ public class LaunchActivity extends BasePermissionsActivity implements ActionBar
                                 break;
                             }
                         }
-                        if (!ok) {
-                            uris = MessagesController.getInstance(intentAccount).exportGroupUri;
-                            for (String u : uris) {
-                                if (uri.contains(u)) {
-                                    args.putInt("dialogsType", 11);
-                                    ok = true;
-                                    break;
-                                }
-                            }
-                            if (!ok) {
-                                args.putInt("dialogsType", 13);
+                    }
+                    pushOpened = false;
+                    isNew = false;
+                } else if (showPlayer) {
+                    if (!actionBarLayout.fragmentsStack.isEmpty()) {
+                        BaseFragment fragment = actionBarLayout.fragmentsStack.get(0);
+                        fragment.showDialog(new AudioPlayerAlert(this));
+                    }
+                    pushOpened = false;
+                } else if (showLocations) {
+                    if (!actionBarLayout.fragmentsStack.isEmpty()) {
+                        BaseFragment fragment = actionBarLayout.fragmentsStack.get(0);
+                        fragment.showDialog(new SharingLocationsAlert(this, info -> {
+                            intentAccount[0] = info.messageObject.currentAccount;
+                            switchToAccount(intentAccount[0], true);
+
+                            LocationActivity locationActivity = new LocationActivity(2);
+                            locationActivity.setMessageObject(info.messageObject);
+                            final long dialog_id = info.messageObject.getDialogId();
+                            locationActivity.setDelegate((location, live, notify, scheduleDate) -> SendMessagesHelper.getInstance(intentAccount[0]).sendMessage(location, dialog_id, null, null, null, notify, scheduleDate));
+                            presentFragment(locationActivity);
+                        }));
+                    }
+                    pushOpened = false;
+                } else if (videoPath != null || photoPathsArray != null || sendingText != null || sendingLocation != null || documentsPathsArray != null || contactsToSend != null || documentsUrisArray != null) {
+                    if (!AndroidUtilities.isTablet()) {
+                        NotificationCenter.getInstance(intentAccount[0]).postNotificationName(NotificationCenter.closeChats);
+                    }
+                    if (dialogId == 0) {
+                        Bundle args = new Bundle();
+                        args.putBoolean("onlySelect", true);
+                        args.putInt("dialogsType", 3);
+                        args.putBoolean("allowSwitchAccount", true);
+                        if (contactsToSend != null) {
+                            if (contactsToSend.size() != 1) {
+                                args.putString("selectAlertString", LocaleController.getString("SendContactToText", R.string.SendMessagesToText));
+                                args.putString("selectAlertStringGroup", LocaleController.getString("SendContactToGroupText", R.string.SendContactToGroupText));
                             }
                         }
                     }
@@ -4068,14 +4097,19 @@ public class LaunchActivity extends BasePermissionsActivity implements ActionBar
                     if (sendingText != null) {
                         SendMessagesHelper.prepareSendingText(accountInstance, sendingText, did, true, 0);
                     }
-                    if (contactsToSend != null && !contactsToSend.isEmpty()) {
-                        for (int a = 0; a < contactsToSend.size(); a++) {
-                            TLRPC.User user = contactsToSend.get(a);
-                            SendMessagesHelper.getInstance(account).sendMessage(user, did, null, null, null, null, notify, 0);
-                        }
-                    }
-                    if (!TextUtils.isEmpty(message) && !videoEditorOpened && !photosEditorOpened) {
-                        SendMessagesHelper.prepareSendingText(accountInstance, message.toString(), did, notify, 0);
+                    SendMessagesHelper.prepareSendingDocuments(accountInstance, documentsPathsArray, documentsOriginalPathsArray, documentsUrisArray, caption, documentsMimeType, did, null, null, null, true, 0);
+                }
+                if (sendingLocation != null) {
+                    SendMessagesHelper.prepareSendingLocation(accountInstance, sendingLocation, did);
+                    sendingText = null;
+                }
+                if (sendingText != null) {
+                    SendMessagesHelper.prepareSendingText(accountInstance, sendingText, did, true, 0);
+                }
+                if (contactsToSend != null && !contactsToSend.isEmpty()) {
+                    for (int a = 0; a < contactsToSend.size(); a++) {
+                        TLRPC.User user = contactsToSend.get(a);
+                        SendMessagesHelper.getInstance(account).sendMessage(user, did, null, null, null, true, 0);
                     }
                 }
             }
@@ -4087,6 +4121,7 @@ public class LaunchActivity extends BasePermissionsActivity implements ActionBar
         photoPathsArray = null;
         videoPath = null;
         sendingText = null;
+        sendingLocation = null;
         documentsPathsArray = null;
         documentsOriginalPathsArray = null;
         contactsToSend = null;
