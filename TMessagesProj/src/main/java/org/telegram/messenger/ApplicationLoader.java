@@ -101,11 +101,22 @@ public class ApplicationLoader extends Application {
         }
         applicationInited = true;
 
-        try {
-            LocaleController.getInstance(); //TODO improve
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        Utilities.stageQueue.postRunnable(() -> {
+
+            try {
+                LocaleController.getInstance(); //TODO improve
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            try {
+                EnvUtil.doTest();
+            } catch (Exception e) {
+                FileLog.e("EnvUtil test Failed", e);
+
+            }
+
+        });
 
         try {
             connectivityManager = (ConnectivityManager) ApplicationLoader.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE);
@@ -152,18 +163,23 @@ public class ApplicationLoader extends Application {
 
         SharedConfig.loadConfig();
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) { //TODO improve account
-            UserConfig.getInstance(a).loadConfig();
-            MessagesController.getInstance(a);
-            if (a == 0) {
-                SharedConfig.pushStringStatus = "__FIREBASE_GENERATING_SINCE_" + ConnectionsManager.getInstance(a).getCurrentTime() + "__";
-            } else {
-                ConnectionsManager.getInstance(a);
-            }
-            TLRPC.User user = UserConfig.getInstance(a).getCurrentUser();
-            if (user != null) {
-                MessagesController.getInstance(a).putUser(user, true);
-                SendMessagesHelper.getInstance(a).checkUnsentMessages();
-            }
+            final int finalA = a;
+            Runnable initRunnable = () -> {
+                UserConfig.getInstance(finalA).loadConfig();
+                MessagesController.getInstance(finalA);
+                if (finalA == 0) {
+                    SharedConfig.pushStringStatus = "__FIREBASE_GENERATING_SINCE_" + ConnectionsManager.getInstance(finalA).getCurrentTime() + "__";
+                } else {
+                    ConnectionsManager.getInstance(finalA);
+                }
+                TLRPC.User user = UserConfig.getInstance(finalA).getCurrentUser();
+                if (user != null) {
+                    MessagesController.getInstance(finalA).putUser(user, true);
+                    SendMessagesHelper.getInstance(finalA).checkUnsentMessages();
+                }
+            };
+            if (finalA == UserConfig.selectedAccount) initRunnable.run();
+            else  Utilities.stageQueue.postRunnable(initRunnable);
         }
 
         ApplicationLoader app = (ApplicationLoader) ApplicationLoader.applicationContext;
@@ -174,8 +190,13 @@ public class ApplicationLoader extends Application {
 
         MediaController.getInstance();
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) { //TODO improve account
-            ContactsController.getInstance(a).checkAppAccount();
-            DownloadController.getInstance(a);
+            final int finalA = a;
+            Runnable initRunnable = () -> {
+                ContactsController.getInstance(finalA).checkAppAccount();
+                DownloadController.getInstance(finalA);
+            };
+            if (finalA == UserConfig.selectedAccount) initRunnable.run();
+            else  Utilities.stageQueue.postRunnable(initRunnable);
         }
         ChatThemeController.init();
     }
@@ -223,6 +244,13 @@ public class ApplicationLoader extends Application {
     }
 
     public static void startPushService() {
+        Utilities.stageQueue.postRunnable(ApplicationLoader::startPushServiceInternal);
+    }
+
+    private static void startPushServiceInternal() {
+        if (ExternalGcm.checkPlayServices() || (SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2 && isNotificationListenerEnabled())) {
+            return;
+        }
         SharedPreferences preferences = MessagesController.getGlobalNotificationsSettings();
         boolean enabled;
         if (preferences.contains("pushService")) {
