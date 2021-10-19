@@ -830,7 +830,11 @@ public class MessagesController extends BaseController implements NotificationCe
         preloadFeaturedStickers = mainPreferences.getBoolean("preloadFeaturedStickers", false);
         youtubePipType = mainPreferences.getString("youtubePipType", "disabled");
         keepAliveService = mainPreferences.getBoolean("keepAliveService", false);
+<<<<<<< HEAD
         backgroundConnection = mainPreferences.getBoolean("keepAliveService", false);
+=======
+        backgroundConnection = mainPreferences.getBoolean("backgroundConnection", false);
+>>>>>>> 302e658b0 (fix backgroundConnection pref read from keepAliveService)
         promoDialogId = mainPreferences.getLong("proxy_dialog", 0);
         nextPromoInfoCheckTime = mainPreferences.getInt("nextPromoInfoCheckTime", 0);
         promoDialogType = mainPreferences.getInt("promo_dialog_type", 0);
