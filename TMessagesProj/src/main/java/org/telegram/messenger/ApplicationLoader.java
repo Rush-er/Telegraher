@@ -46,6 +46,7 @@ import org.telegram.ui.Components.ForegroundDetector;
 import java.io.File;
 
 public class ApplicationLoader extends Application {
+    private static PendingIntent pendingIntent;
 
     @SuppressLint("StaticFieldLeak")
     public static volatile Context applicationContext;
@@ -230,17 +231,44 @@ public class ApplicationLoader extends Application {
             enabled = MessagesController.getMainSettings(UserConfig.selectedAccount).getBoolean("keepAliveService", false);
         }
         if (enabled) {
-            try {
-                applicationContext.startService(new Intent(applicationContext, NotificationsService.class));
-            } catch (Throwable ignore) {
+            UIUtil.runOnUIThread(() -> {
+                try {
+                    Log.d("TFOSS", "Trying to start push service every 10 minutes");
+                    // Telegram-FOSS: unconditionally enable push service
+                    AlarmManager am = (AlarmManager) applicationContext.getSystemService(Context.ALARM_SERVICE);
+                    Intent i = new Intent(applicationContext, NotificationsService.class);
+                    pendingIntent = PendingIntent.getBroadcast(applicationContext, 0, i, 0);
 
-            }
-        } else {
+                    am.cancel(pendingIntent);
+                    am.setInexactRepeating(AlarmManager.RTC_WAKEUP, System.currentTimeMillis(), 10 * 60 * 1000, pendingIntent);
+
+                    Log.d("TFOSS", "Starting push service...");
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        applicationContext.startForegroundService(new Intent(applicationContext, NotificationsService.class));
+                    } else {
+                        applicationContext.startService(new Intent(applicationContext, NotificationsService.class));
+                    }
+                } catch (Throwable e) {
+                    Log.d("TFOSS", "Failed to start push service");
+                }
+            });
+
+        } else UIUtil.runOnUIThread(() -> {
             applicationContext.stopService(new Intent(applicationContext, NotificationsService.class));
 
             PendingIntent pintent = PendingIntent.getService(applicationContext, 0, new Intent(applicationContext, NotificationsService.class), 0);
             AlarmManager alarm = (AlarmManager)applicationContext.getSystemService(Context.ALARM_SERVICE);
             alarm.cancel(pintent);
+            if (pendingIntent != null) {
+                alarm.cancel(pendingIntent);
+            }
+        });
+    }
+
+    public static boolean isNotificationListenerEnabled() {
+        Set<String> packageNames = NotificationManagerCompat.getEnabledListenerPackages(applicationContext);
+        if (packageNames.contains(applicationContext.getPackageName())) {
+            return true;
         }
     }
 
